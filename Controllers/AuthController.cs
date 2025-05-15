@@ -3,6 +3,8 @@ using MonBackendAspNet.Models;
 using MonBackendAspNet.Data;
 using MonBackendAspNet.DTOs.Auth;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+
 
 namespace MonBackendAspNet.Controllers
 {
@@ -31,8 +33,10 @@ namespace MonBackendAspNet.Controllers
             {
                 Username = dto.Username,
                 Email = dto.Email,
-                Password = dto.Password // 🔒 à hasher plus tard
             };
+
+            var hasher = new PasswordHasher<User>();
+            user.Password = hasher.HashPassword(user, dto.Password);
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -44,8 +48,13 @@ namespace MonBackendAspNet.Controllers
         public async Task<IActionResult> Login(LoginDto dto)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (user == null)
+                return Unauthorized(new { message = "Identifiants invalides." });
 
-            if (user == null || user.Password != dto.Password) // 🔐 à remplacer par une vérif hashée
+            var hasher = new PasswordHasher<User>();
+            var result = hasher.VerifyHashedPassword(user, user.Password, dto.Password);
+
+            if (result == PasswordVerificationResult.Failed)
                 return Unauthorized(new { message = "Identifiants invalides." });
 
             return Ok(new { message = "Connexion réussie", userId = user.Id });
